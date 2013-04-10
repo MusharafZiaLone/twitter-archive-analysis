@@ -5,12 +5,16 @@ from optparse import OptionParser
 import datetime, pytz
 from dateutil.tz import tzlocal
 
+import itertools
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import matplotlib.patches as patches
 import matplotlib.path as path
 import matplotlib.cm as cm
+
+import webbrowser
 
 from collections import Counter
 
@@ -19,29 +23,30 @@ import nltk.corpus
 from nltk import decorators
 import nltk.stem
 
-HEADER = [  'tweet_id', 'in_reply_to_status_id', 'in_reply_to_user_id', 'retweeted_status_id', \
-            'retweeted_status_user_id', 'timestamp', 'source', 'text', 'expanded_urls']
-HEADER_DICT = dict( (name,i) for i, name in enumerate(HEADER) )
+from pytagcloud import create_tag_image, make_tags
+from pytagcloud.lang.counter import get_tag_counts
+from pytagcloud.lang.stopwords import StopWords
+from pytagcloud.colors import COLOR_SCHEMES
 
-stemmer_func = nltk.stem.snowball.EnglishStemmer().stem
 stopwords = set(nltk.corpus.stopwords.words('english'))
 
-def load_tweets(tweet_dir):
-    tweet_files = os.listdir(tweet_dir)
-    #print header_map
+HEADER = [  'tweet_id', 'in_reply_to_status_id', 'in_reply_to_user_id', 'retweeted_status_id', \
+            'retweeted_status_user_id', 'timestamp', 'source', 'text', 'expanded_urls']
 
+HEADER_DICT = dict( (name,i) for i, name in enumerate(HEADER) )
+
+def load_tweets():
     tweets = []
-    for f in tweet_files:
-        file_path = os.path.join(tweet_dir, f)
-        with open(file_path,'r') as csvfile:
-            csvreader = csv.reader(csvfile, delimiter=',', quotechar='"')
-            csvreader.next() # Skip header
-            for row in csvreader:
-                tweets.append(row)
+    file_path = "tweets.csv"
+    with open(file_path,'r') as csvfile:
+        csvreader = csv.reader(csvfile, delimiter=',', quotechar='"')
+        csvreader.next() # Skip header
+        for row in csvreader:
+            tweets.append(row)
 
     print 'Loaded %d tweets' % len(tweets)
 
-    #print tweets[:10]
+    print tweets[:10]
 
     return tweets
 
@@ -82,7 +87,7 @@ def by_hour(tweets):
     ax.set_xlim(left[0], right[-1])
     ax.set_ylim(bottom.min(), top.max())
 
-    #plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     plt.xticks( range(0,24), ha='center' )
 
     plt.xlabel('Hour')
@@ -161,7 +166,7 @@ def by_month_dow(tweets):
         timestamp = timestamp.astimezone( tzlocal() )
         weekday = timestamp.strftime('%A')
         iso_yr, iso_wk, iso_wkday = timestamp.isocalendar()
-        #key = str(iso_yr) + '-' + str(iso_wk)
+        key = str(iso_yr) + '-' + str(iso_wk)
         key = timestamp.strftime('%Y-%m')
         if key  not in data:
             data[key] = Counter()
@@ -173,16 +178,16 @@ def by_month_dow(tweets):
     a = np.zeros( (7, len(data)) )
     for i,key in enumerate(sorted(data.iterkeys())):
         for j,d in enumerate(dow):
-            #a[j,i] = data[key][d]
+            a[j,i] = data[key][d]
             for k in range(data[key][d]):
                 xs.append(j)
                 ys.append(i)
-    # Convert to x,y pairs
-    # heatmap, xedges, yedges = np.histogram2d(np.array(xs), np.array(ys), bins=(7,len(data)))
-    # extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-    # plt.clf()
-    # plt.imshow(heatmap, extent=extent)
-    # plt.show()
+    #Convert to x,y pairs
+    heatmap, xedges, yedges = np.histogram2d(np.array(xs), np.array(ys), bins=(7,len(data)))
+    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    plt.clf()
+    plt.imshow(heatmap, extent=extent)
+    plt.show()
 
     x = np.array(xs)
     y = np.array(ys)
@@ -307,54 +312,86 @@ def by_month_type(tweets):
 
     plt.savefig('by-month-type-stacked.png', bbox_inches=0)
     plt.show()
+    
+tweets = load_tweets()
 
 @decorators.memoize
 def get_words(tweet_text):
     return [word.lower() for word in re.findall('\w+', tweet_text) if len(word) > 3]
 
+
 def word_frequency(tweets):
     c = Counter()
     hash_c = Counter()
     at_c = Counter()
+    s = StopWords()     
+    s.load_language("english")
+    
     for tweet in tweets:
         for word in get_words( tweet[ HEADER_DICT['text'] ] ):
-            c[ word ] += 1
+            if not s.is_stop_word(word):
+                if c.has_key(word):
+                    c[ word ] += 1
+                else:
+                    c[ word ] = 1
+                    
         for word in re.findall('@\w+', tweet[ HEADER_DICT['text'] ]):
             at_c[ word.lower() ] += 1
         for word in re.findall('\#[\d\w]+', tweet[ HEADER_DICT['text'] ]):
             hash_c[ word.lower() ] += 1
+            
     print c.most_common(50)
     print hash_c.most_common(50)
     print at_c.most_common(50)
 
-@decorators.memoize
-def normalize_word(word):
-    return stemmer_func(word.lower())
+    #Making word clouds for your most common words, most common @replies and most common #hashtags.
 
-@decorators.memoize
-def vectorspaced(tweet_text, all_words):
-    components = [normalize_word(word) for word in get_words( tweet_text )]
-    return np.array([
-        word in components and not word in stopwords
-        for word in all_words], np.short)
+    ctags = make_tags(c.most_common(100), maxsize=90, 
+                         colors=COLOR_SCHEMES['audacity'])
+    create_tag_image(ctags, 'c_most_common.png', size=(900, 600), fontname='Lobster')
+    webbrowser.open('c_most_common.png')
 
+    hash_ctags = make_tags(hash_c.most_common(100), maxsize=100, 
+                         colors=COLOR_SCHEMES['citrus'])
+    create_tag_image(hash_ctags, 'hash_c_most_common.png', size=(900, 600), fontname='Cuprum')
+    webbrowser.open('hash_c_most_common.png')
+
+    at_ctags = make_tags(at_c.most_common(100), maxsize=90)
+    create_tag_image(at_ctags, 'at_c_most_common.png', size=(900, 600), fontname='Yanone Kaffeesatz')
+    webbrowser.open('at_c_most_common.png')
+
+#Word clusters are still not working. I'm going to get help on this.
+    #If you have experience with nltk, feedback is appreciated!
+    
 def get_word_clusters(tweets):
-    all_words = set()
-    for tweet in tweets:
-        for word in get_words( tweet[ HEADER_DICT['text'] ] ):
-            all_words.add(word)
-    all_words = tuple(all_words)
 
-    cluster = GAAClusterer(5)
-    cluster.cluster([vectorspaced( tweet[ HEADER_DICT['text'] ], all_words) for tweet in tweets])
+    cluster = KMeansClusterer(10, euclidean_distance, avoid_empty_clusters = True)
+    cluster.cluster([vectorspaced(tweet) for tweet in ListTweets])
 
     classified_examples = [
-        cluster.classify(vectorspaced( tweet[ HEADER_DICT['text'] ], all_words)) for tweet in tweets
+        cluster.classify(vectorspaced(tweet)) for tweet in ListTweets
     ]
 
-    for cluster_id, title in sorted(zip(classified_examples, job_titles)):
-        print cluster_id, title
+    for cluster_id, tweet in sorted(zip(classified_examples, ListTweets)):
+        print cluster_id, tweet
 
+ListWordsA = []
+for tweet in tweets:
+    words = get_words( tweet[ HEADER_DICT['text'] ] )
+    ListWordsA.append(words)
+    ListWords = list(itertools.chain(*ListWordsA))
+    
+ListTweets = []
+for tweet in tweets:
+    ListTweets.append(tweet[ HEADER_DICT['text']])
+
+@decorators.memoize
+def vectorspaced(tweet_text):
+    components = [word.lower() for word in ListWords]
+    return np.array([
+        word in components and not word in stopwords for word in ListWords])
+        
+        
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-d", "--dir", dest="directory",
@@ -362,9 +399,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
-    tweet_dir = os.path.join(options.directory, 'data', 'csv')
-
-    tweets = load_tweets(tweet_dir)
+    tweets = load_tweets()
     
     by_month(tweets)
     by_month_type(tweets)
@@ -373,4 +408,8 @@ if __name__ == '__main__':
     by_dow(tweets)
     by_hour(tweets)
     word_frequency(tweets)
-    # get_word_clusters(tweets)
+
+# Word Clusters are broken still. Better than before, but will only find one cluster.
+
+##    get_word_clusters(tweets)
+    
