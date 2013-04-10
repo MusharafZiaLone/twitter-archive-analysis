@@ -12,3 +12,7 @@ More information about where to get your tweet archive can be found here:
 http://blog.twitter.com/2012/12/your-twitter-archive.html
 
 Run analyze.py from the command line or with IDLE.
+
+See my tweet archive analyzed and visualized here:
+
+http://laurenarcher.github.io/twitter-archive-analysis/
