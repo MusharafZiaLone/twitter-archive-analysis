@@ -1,5 +1,4 @@
-
-Here are the libraries you will need to run this code, and an suggested insall order:
+Here are the libraries you will need to run this code, and an suggested install order:
 
 1. easy_install or pip install:
 
