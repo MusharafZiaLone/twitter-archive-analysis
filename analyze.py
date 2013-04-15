@@ -313,7 +313,6 @@ def by_month_type(tweets):
     plt.savefig('by-month-type-stacked.png', bbox_inches=0)
     plt.show()
     
-tweets = load_tweets()
 
 @decorators.memoize
 def get_words(tweet_text):
