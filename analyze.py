@@ -381,10 +381,15 @@ def get_all_words(tweets):
         words = get_words( tweet[ HEADER_DICT['text'] ] )
         ListWordsA.append(words)
         ListWords = list(itertools.chain(*ListWordsA))
-    
-ListTweets = []
-for tweet in tweets:
-    ListTweets.append(tweet[ HEADER_DICT['text']])
+    return ListWords
+
+
+def get_all_text(tweets):    
+    ListTweets = []
+    for tweet in tweets:
+        ListTweets.append(tweet[ HEADER_DICT['text']])
+    return ListTweets
+
 
 @decorators.memoize
 def vectorspaced(tweet_text):
