@@ -1,6 +1,6 @@
 
 from optparse import OptionParser
-from twitter-archive-analysis import analyze
+import analyze
 
 
 def main():
