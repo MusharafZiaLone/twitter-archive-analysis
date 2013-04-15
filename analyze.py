@@ -376,12 +376,10 @@ def get_word_clusters(tweets):
 
 
 def get_all_words(tweets):
-    ListWordsA = []
     for tweet in tweets:
         words = get_words( tweet[ HEADER_DICT['text'] ] )
-        ListWordsA.append(words)
-        ListWords = list(itertools.chain(*ListWordsA))
-    return ListWords
+        for word in words:
+            yield word
 
 
 def get_all_text(tweets):    
