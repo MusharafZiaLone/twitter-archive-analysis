@@ -374,11 +374,13 @@ def get_word_clusters(tweets):
     for cluster_id, tweet in sorted(zip(classified_examples, ListTweets)):
         print cluster_id, tweet
 
-ListWordsA = []
-for tweet in tweets:
-    words = get_words( tweet[ HEADER_DICT['text'] ] )
-    ListWordsA.append(words)
-    ListWords = list(itertools.chain(*ListWordsA))
+
+def get_all_words(tweets):
+    ListWordsA = []
+    for tweet in tweets:
+        words = get_words( tweet[ HEADER_DICT['text'] ] )
+        ListWordsA.append(words)
+        ListWords = list(itertools.chain(*ListWordsA))
     
 ListTweets = []
 for tweet in tweets:
