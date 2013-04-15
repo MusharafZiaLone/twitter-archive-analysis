@@ -383,10 +383,8 @@ def get_all_words(tweets):
 
 
 def get_all_text(tweets):    
-    ListTweets = []
     for tweet in tweets:
-        ListTweets.append(tweet[ HEADER_DICT['text']])
-    return ListTweets
+        yield tweet[ HEADER_DICT['text']]
 
 
 @decorators.memoize
