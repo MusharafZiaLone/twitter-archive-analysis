@@ -363,7 +363,7 @@ def word_frequency(tweets):
     #If you have experience with nltk, feedback is appreciated!
     
 def get_word_clusters(tweets):
-
+    ListTweets = get_all_text(tweets)
     cluster = KMeansClusterer(10, euclidean_distance, avoid_empty_clusters = True)
     cluster.cluster([vectorspaced(tweet) for tweet in ListTweets])
 
