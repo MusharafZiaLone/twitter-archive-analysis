@@ -1,4 +1,5 @@
 import os, csv, re
+import pdb
 
 from optparse import OptionParser
 
@@ -313,7 +314,6 @@ def by_month_type(tweets):
     plt.savefig('by-month-type-stacked.png', bbox_inches=0)
     plt.show()
     
-tweets = load_tweets()
 
 @decorators.memoize
 def get_words(tweet_text):
@@ -360,36 +360,79 @@ def word_frequency(tweets):
     create_tag_image(at_ctags, 'at_c_most_common.png', size=(900, 600), fontname='Yanone Kaffeesatz')
     webbrowser.open('at_c_most_common.png')
 
+
 #Word clusters are still not working. I'm going to get help on this.
     #If you have experience with nltk, feedback is appreciated!
     
 def get_word_clusters(tweets):
-
+    ListTweets = get_all_text(tweets)
+    ListTweets = list(ListTweets)
+    #   Project tweet text onto a vector space 
+    vs_tweets = list(TweetVectors(tweets))
     cluster = KMeansClusterer(10, euclidean_distance, avoid_empty_clusters = True)
-    cluster.cluster([vectorspaced(tweet) for tweet in ListTweets])
-
-    classified_examples = [
-        cluster.classify(vectorspaced(tweet)) for tweet in ListTweets
-    ]
-
+    cluster.cluster(vs_tweets)
+    classified_examples = [ cluster.classify(tweet) for tweet in vs_tweets ]
     for cluster_id, tweet in sorted(zip(classified_examples, ListTweets)):
         print cluster_id, tweet
 
-ListWordsA = []
-for tweet in tweets:
-    words = get_words( tweet[ HEADER_DICT['text'] ] )
-    ListWordsA.append(words)
-    ListWords = list(itertools.chain(*ListWordsA))
-    
-ListTweets = []
-for tweet in tweets:
-    ListTweets.append(tweet[ HEADER_DICT['text']])
 
-@decorators.memoize
-def vectorspaced(tweet_text):
-    components = [word.lower() for word in ListWords]
-    return np.array([
-        word in components and not word in stopwords for word in ListWords])
+def get_all_words(tweets):
+    for tweet in tweets:
+        words = get_words( tweet[ HEADER_DICT['text'] ] )
+        words = ( word.strip().lower() for word in words )
+        words = ( word for word in words if word not in stopwords )
+        for word in words:
+            yield word
+
+
+def get_all_text(tweets):    
+    for tweet in tweets:
+        yield tweet[ HEADER_DICT['text']]
+
+
+class TweetVectors(object):
+    def __init__(self, tweets):
+        self.tweets = list(get_all_text(tweets))
+        self.words = list(get_all_words(tweets))
+    
+    @decorators.memoize
+    def vectorspaced(self, tweet_text):
+        #   Tokenize the words in this tweet
+        tweet_words = tweet_text.split(' ')
+        tweet_words = ( word.strip().lower() for word in tweet_words )
+        tweet_words = ( word for word in tweet_words if word not in stopwords )
+        tweet_words = set(tweet_words)
+        #   Check whether each word in the total set of words is in the current tweet.
+        components = ( word in tweet_words for word in self.words )        
+        components = list(components)
+        components = np.array(components)
+        return components
+    
+    def __iter__(self):
+        prev = None
+        prev_prev = None
+        for tweet in self.tweets:
+            vs_tweet = self.vectorspaced(tweet)
+            ##########
+            #   Some simple error checks.
+            try:
+                #   Check whether the vectors have content
+                assert vs_tweet.any()
+            except AssertionError as e:
+                print e
+                print 'WARNING: The vector for {0} is empty.'.format(tweet)
+            try:
+                #   Check whether the last three vectors have been the same.
+                if (prev is not None) and (prev_prev is not None):
+                    assert not ((vs_tweet == prev).all() and (prev == prev_prev).all())
+            except AssertionError as e:
+                print e
+                print 'WARNING: The last three vectors have been identical.'
+            ##########
+            prev_prev = prev
+            prev = vs_tweet
+            yield vs_tweet
+            
         
         
 if __name__ == '__main__':
